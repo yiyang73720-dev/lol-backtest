@@ -1,6 +1,4 @@
 import { NextResponse } from "next/server";
-import { readFileSync, existsSync } from "fs";
-import { join } from "path";
 import {
   fetchRecentGames,
   fetchPlayersForGames,
@@ -12,6 +10,7 @@ import {
   PlayerChampionStats,
   League,
 } from "@/lib/types";
+import seedData from "@/lib/seed-data.json";
 
 const ROLE_ORDER = ["top", "jungle", "mid", "bot", "support"];
 
@@ -21,17 +20,9 @@ function roleIndex(role: string): number {
   return idx >= 0 ? idx : 99;
 }
 
-// Try loading from local cache first (populated by scripts/fetch-recent.ts)
-function loadFromCache(leagues: League[], daysBack: number): GameWithPlayerStats[] | null {
-  const cachePath = join(process.cwd(), "cache", "seed-data.json");
-  if (!existsSync(cachePath)) return null;
-
+function loadFromSeed(leagues: League[], daysBack: number): GameWithPlayerStats[] | null {
   try {
-    const raw = JSON.parse(readFileSync(cachePath, "utf-8"));
-
-    // Check freshness: cache must be less than 2 hours old
-    const cacheAge = Date.now() - new Date(raw.generatedAt).getTime();
-    if (cacheAge > 2 * 60 * 60 * 1000) return null;
+    const raw = seedData as any;
 
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - daysBack);
@@ -80,7 +71,6 @@ function loadFromCache(leagues: League[], daysBack: number): GameWithPlayerStats
             championStats: statsMap.get(`${p.playerName}|||${p.champion}`) || null,
           }));
       } else {
-        // Fallback: use picks from game data (no player names)
         team1Players = (game.team1Picks || []).map((champ: string, i: number): PlayerInGame => ({
           playerName: "",
           champion: champ,
@@ -98,7 +88,7 @@ function loadFromCache(leagues: League[], daysBack: number): GameWithPlayerStats
       return { ...game, team1Players, team2Players };
     });
   } catch (e) {
-    console.error("Cache read error:", e);
+    console.error("Seed data load error:", e);
     return null;
   }
 }
@@ -111,11 +101,11 @@ export async function GET(request: Request) {
   const forceRefresh = searchParams.get("refresh") === "true";
 
   try {
-    // Try cache first
+    // Try bundled seed data first
     if (!forceRefresh) {
-      const cached = loadFromCache(leagues, daysBack);
+      const cached = loadFromSeed(leagues, daysBack);
       if (cached && cached.length > 0) {
-        return NextResponse.json({ games: cached, source: "cache" });
+        return NextResponse.json({ games: cached, source: "seed" });
       }
     }
 
