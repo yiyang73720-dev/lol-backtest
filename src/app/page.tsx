@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { GameWithPlayerStats, BacktestPrediction, League } from "@/lib/types";
+import { loadGamesFromSeed } from "@/lib/load-games";
 import GameCard from "@/components/GameCard";
 import ScoreTracker from "@/components/ScoreTracker";
 import LeagueFilter from "@/components/LeagueFilter";
@@ -37,24 +38,19 @@ export default function Home() {
     setPredictions(loadPredictions());
   }, []);
 
-  // Fetch games
+  // Load games from bundled seed data (no API call needed)
   useEffect(() => {
-    async function fetchGames() {
-      setLoading(true);
-      setError(null);
-      try {
-        const leagues = Array.from(activeLeagues).join(",");
-        const res = await fetch(`/api/games?leagues=${leagues}&days=7`);
-        if (!res.ok) throw new Error(`API error: ${res.status}`);
-        const data = await res.json();
-        setGames(data.games || []);
-      } catch (e) {
-        setError(String(e));
-      } finally {
-        setLoading(false);
-      }
+    setLoading(true);
+    setError(null);
+    try {
+      const leagues = Array.from(activeLeagues) as League[];
+      const loaded = loadGamesFromSeed(leagues, 14);
+      setGames(loaded);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setLoading(false);
     }
-    fetchGames();
   }, [activeLeagues]);
 
   // Calculate current index based on predictions
