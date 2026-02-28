@@ -8,23 +8,34 @@
 const BASE_URL = "https://lol.fandom.com/api.php";
 
 let lastReqTime = 0;
-async function rateFetch(url: string): Promise<any> {
+async function rateFetch(url: string, retries = 3): Promise<any> {
   const now = Date.now();
-  const wait = 5500 - (now - lastReqTime);
+  const wait = 8000 - (now - lastReqTime); // 8s between requests (safer)
   if (wait > 0) await new Promise((r) => setTimeout(r, wait));
   lastReqTime = Date.now();
 
   const res = await fetch(url);
   if (!res.ok) {
-    if (res.status === 429) {
-      console.log("  Rate limited, waiting 15s...");
-      await new Promise((r) => setTimeout(r, 15000));
+    if (res.status === 429 && retries > 0) {
+      console.log("  HTTP 429 rate limited, waiting 30s...");
+      await new Promise((r) => setTimeout(r, 30000));
       lastReqTime = Date.now();
-      return fetch(url).then((r) => r.json());
+      return rateFetch(url, retries - 1);
     }
     throw new Error(`HTTP ${res.status}`);
   }
-  return res.json();
+  const data = await res.json();
+  // Leaguepedia returns 200 with JSON error body when rate limited
+  if (data.error && data.error.code === "ratelimited") {
+    if (retries > 0) {
+      console.log("  JSON rate limited, waiting 30s...");
+      await new Promise((r) => setTimeout(r, 30000));
+      lastReqTime = Date.now();
+      return rateFetch(url, retries - 1);
+    }
+    throw new Error("Rate limited after retries");
+  }
+  return data;
 }
 
 function buildQuery(params: {
@@ -65,10 +76,10 @@ async function main() {
   mkdirSync(cacheDir, { recursive: true });
 
   const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - 7);
+  cutoff.setDate(cutoff.getDate() - 14);
   const cutoffStr = cutoff.toISOString().slice(0, 10);
 
-  console.log(`Fetching games since ${cutoffStr}...`);
+  console.log(`Fetching games since ${cutoffStr} (last 14 days)...`);
 
   // Step 1: Fetch recent games from each league
   const leagues = ["LCK", "LPL", "LEC", "LCS"];

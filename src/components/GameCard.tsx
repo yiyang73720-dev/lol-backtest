@@ -1,6 +1,7 @@
 "use client";
 
 import { GameWithPlayerStats, PlayerInGame, BacktestPrediction } from "@/lib/types";
+import { getChampionIconUrl } from "@/lib/champion-icons";
 
 const LEAGUE_COLORS: Record<string, string> = {
   LCK: "#c8aa6e",
@@ -43,6 +44,22 @@ function WinRateBadge({ stats }: { stats: PlayerInGame["championStats"] }) {
   );
 }
 
+function ChampionIcon({ champion, size = 24 }: { champion: string; size?: number }) {
+  const url = getChampionIconUrl(champion);
+  if (!url) return null;
+  return (
+    <img
+      src={url}
+      alt={champion}
+      width={size}
+      height={size}
+      className="rounded-sm"
+      style={{ minWidth: size, minHeight: size }}
+      onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+    />
+  );
+}
+
 function PlayerRow({ player }: { player: PlayerInGame }) {
   return (
     <div className="flex items-center gap-2 py-1">
@@ -50,13 +67,14 @@ function PlayerRow({ player }: { player: PlayerInGame }) {
         {ROLE_LABELS[player.role.toLowerCase()] || player.role}
       </span>
       {player.playerName ? (
-        <span className="text-sm font-medium w-28 truncate" title={player.playerName}>
+        <span className="text-sm font-medium w-24 truncate" title={player.playerName}>
           {player.playerName}
         </span>
       ) : (
-        <span className="text-sm text-gray-600 w-28 italic">—</span>
+        <span className="text-sm text-gray-600 w-24 italic">—</span>
       )}
-      <span className="text-sm text-blue-300 w-24 truncate" title={player.champion}>
+      <ChampionIcon champion={player.champion} size={22} />
+      <span className="text-sm text-blue-300 w-20 truncate" title={player.champion}>
         {player.champion}
       </span>
       <WinRateBadge stats={player.championStats} />
@@ -72,8 +90,9 @@ function BanList({ bans, label }: { bans: string[]; label: string }) {
       {bans.map((ban, i) => (
         <span
           key={i}
-          className="text-[11px] px-1.5 py-0.5 rounded bg-red-900/30 text-red-400 border border-red-800/30"
+          className="inline-flex items-center gap-1 text-[11px] px-1.5 py-0.5 rounded bg-red-900/30 text-red-400 border border-red-800/30"
         >
+          <ChampionIcon champion={ban} size={14} />
           {ban}
         </span>
       ))}
